@@ -1,0 +1,48 @@
+---
+title: "Assignment"
+author: "Sylvain Tenier"
+date: "23 mars 2016"
+output: html_document
+---
+
+# Preprocessing
+
+## Data cleaning and feature selection
+```{r}
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",na.strings=c("NA",""))
+```
+
+### Strategy for missing values
+We first check the ratio of missing data for each column
+```{r}
+table(colSums(is.na(training))/nrow(training))
+```
+We conclude that 51 columns contain over 97% of missing values and choose to remove them
+
+```{r}
+withoutNA <- training[,colSums(is.na(training))==0]
+```
+
+### Removing correlated variables
+
+We then calculate highly correlated variables and remove those that are more than 95% correlated to another.
+
+```{r}
+library(caret)
+predictors <- withoutNA[,-which(colnames(withoutNA)=="classe")]
+numPredictors<-predictors[,sapply(predictors,is.numeric)]
+cm <- cor(numPredictors)
+highlyCorrelated <- findCorrelation(cm, cutoff=0.95,verbose=TRUE)
+drops <- colnames(numPredictors[,highlyCorrelated])
+withoutCor <- withoutNA[, !(names(withoutNA) %in% drops)]
+```
+
+
+Finaly, we use Recursive Feature Elimination to identify relevant attributes 
+```{r}
+control <- rfeControl(functions=rfFuncs,method="cv",number=10)
+results <- rfe(withoutCor, training[,160], sizes=c(1:10), rfeControl=control)
+print(results)
+predictors(results)
+plot(results, type=c("g", "o"))
+```
