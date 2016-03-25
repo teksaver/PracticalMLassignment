@@ -1,67 +1,86 @@
 ---
-title: "Assignment"
+title: "Practical Machine Learning Assignment"
 author: "Sylvain Tenier"
 date: "23 mars 2016"
 output: html_document
 ---
+# Executive summary
 
-# Preprocessing
+We are tasked to create a model able to predict with great accuracy how well people do a particular activity. We are given a training set of 19622 observations from data on accelerometers on the belt, forearm, arm, and dumbell of 6 participants. We first try to fit an interpretable decision tree model that give poor results on the training set. We then create a random forrest model that provides near-perfect accuract on the training set and 20/20 on the testing set. 
 
-## Data cleaning and feature selection
+
+# Loading and preprocessing
+
+We first load the datasets and remove the 6 first colums that are not related to prediction
 ```{r}
-training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",na.strings=c("NA",""))
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",na.strings=c("NA","","#DIV/0!"))
+training <- training[,-c(1:6)]
+testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
 ```
 
-### Strategy for missing values
-We first check the ratio of missing data for each column
+We then remove all colmumns that have more than 95% missing values on the training set
 ```{r}
-table(colSums(is.na(training))/nrow(training))
-```
-We conclude that 60 columns contain over 97% of missing values and choose to remove them
-
-```{r}
-withoutNA <- training[,colSums(is.na(training))==0]
+withoutNA<- training[,!colSums(is.na(training))/nrow(training)>0.95]
 ```
 
-### Removing correlated variables
+## Removing correlated variables
 
 We then calculate highly correlated variables and remove those that are more than 95% correlated to another.
-
 ```{r}
 library(caret)
 predictors <- withoutNA[,-which(colnames(withoutNA)=="classe")]
 numPredictors<-predictors[,sapply(predictors,is.numeric)]
 cm <- cor(numPredictors)
-highlyCorrelated <- findCorrelation(cm, cutoff=0.95,verbose=TRUE)
+highlyCorrelated <- findCorrelation(cm, cutoff=0.95,verbose=FALSE)
 drops <- colnames(numPredictors[,highlyCorrelated])
 withoutCor <- withoutNA[, !(names(withoutNA) %in% drops)]
 ```
 
-We then estimate the remaining features importance by building a model
-(source : http://machinelearningmastery.com/feature-selection-with-the-caret-r-package/)
+# Interpretable decision tree model
+We start by fitting a decision tree model. We use PCA and crossvalidation.
 
-```{r}
-# load the library
-library(mlbench)
-# load the dataset
-trainingModel=cbind(withoutCor,training[,160])
-# prepare training scheme
-control <- trainControl(method="repeatedcv", number=10, repeats=3)
-# train the model
-model <- train(classe~., data=trainingModel, method="lvq", preProcess="scale", trControl=control)
-# estimate variable importance
-importance <- varImp(model, scale=FALSE)
-# summarize importance
-print(importance)
-# plot importance
-plot(importance)
+```{r cache=TRUE}
+#make the pricess reproducible
+set.seed(1979)
+#train a decision tree with cross validation
+modelTree <- train(classe~., data=withoutCor, method="rpart", trControl = trainControl(method = "cv"))
 ```
 
-Finaly, we use Recursive Feature Elimination to identify relevant attributes 
+The tree uses few predictors. The accuracy is not good: for instance, no instance of class D is predicted on the training set.
 ```{r}
-control <- rfeControl(functions=rfFuncs,method="cv",number=10)
-results <- rfe(withoutCor, training[,160], sizes=c(1:10), rfeControl=control)
-print(results)
-predictors(results)
-plot(results, type=c("g", "o"))
+library(rattle)
+fancyRpartPlot(modelTree$finalModel)
+plot(varImp(modelTree, scale=FALSE))
+library(knitr)
+res <-confusionMatrix(predict(modelTree,training),training$classe)
+kable(res$table)
+res$overall
+```
+
+# Random forrest model
+
+```{r cache=TRUE}
+# train a random forrest model with PCA (thresh of 0.95) and cross validation
+modelRFPCA <- train(classe~., data=withoutCor, method="rf", preProcess=c("pca"), trControl = trainControl(method = "cv"))
+#train a random forrest without PCA
+modelRF <- train(classe~., data=withoutCor, method="rf", trControl = trainControl(method = "cv"))
+```
+
+```{r}
+#modelRF
+# display variable importance estimation
+plot(varImp(modelRF, scale=FALSE))
+```
+Without PCA we get:
+```{r}
+res <-confusionMatrix(predict(modelRF,training),training$classe)
+kable(res$table)
+res$overall
+```
+With PCA: 
+```{r}
+res <-confusionMatrix(predict(modelRFPCA,training),training$classe)
+kable(res$table)
+res$overall
 ```
