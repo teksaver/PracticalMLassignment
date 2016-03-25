@@ -17,7 +17,7 @@ We first check the ratio of missing data for each column
 ```{r}
 table(colSums(is.na(training))/nrow(training))
 ```
-We conclude that 51 columns contain over 97% of missing values and choose to remove them
+We conclude that 60 columns contain over 97% of missing values and choose to remove them
 
 ```{r}
 withoutNA <- training[,colSums(is.na(training))==0]
@@ -37,6 +37,25 @@ drops <- colnames(numPredictors[,highlyCorrelated])
 withoutCor <- withoutNA[, !(names(withoutNA) %in% drops)]
 ```
 
+We then estimate the remaining features importance by building a model
+(source : http://machinelearningmastery.com/feature-selection-with-the-caret-r-package/)
+
+```{r}
+# load the library
+library(mlbench)
+# load the dataset
+trainingModel=cbind(withoutCor,training[,160])
+# prepare training scheme
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+# train the model
+model <- train(classe~., data=trainingModel, method="lvq", preProcess="scale", trControl=control)
+# estimate variable importance
+importance <- varImp(model, scale=FALSE)
+# summarize importance
+print(importance)
+# plot importance
+plot(importance)
+```
 
 Finaly, we use Recursive Feature Elimination to identify relevant attributes 
 ```{r}
