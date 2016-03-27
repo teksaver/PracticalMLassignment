@@ -6,13 +6,13 @@ output: html_document
 ---
 # Executive summary
 
-We are tasked to create a model able to predict with great accuracy how well people do a particular activity. We are given a training set of 19622 observations from data on accelerometers on the belt, forearm, arm, and dumbell of 6 participants. We first try to fit an interpretable decision tree model that give poor results on the training set. We then create a random forrest model that provides near-perfect accuract on the training set and 20/20 on the testing set. 
+We are tasked to create a model able to predict with great accuracy how well people do a particular activity. We are given a training set of 19622 observations from data on accelerometers on the belt, forearm, arm, and dumbell of 6 participants. We first try to fit an interpretable decision tree model that give poor results on the training set. We then create a boosted tree model that improves the resulats. Finally, we fit a random forest model that provides near-perfect accuract on the training set and 20/20 on the testing set. 
 
 
 # Loading and preprocessing
 
 We first load the datasets and remove the 6 first colums that are not related to prediction
-```{r}
+```{r loading}
 training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",na.strings=c("NA","","#DIV/0!"))
 training <- training[,-c(1:6)]
 testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
@@ -20,67 +20,111 @@ testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-tes
 ```
 
 We then remove all colmumns that have more than 95% missing values on the training set
-```{r}
+```{r remove_na}
 withoutNA<- training[,!colSums(is.na(training))/nrow(training)>0.95]
 ```
 
 ## Removing correlated variables
 
 We then calculate highly correlated variables and remove those that are more than 95% correlated to another.
-```{r}
-library(caret)
+```{r remove_correlated}
+suppressPackageStartupMessages(library(caret))
 predictors <- withoutNA[,-which(colnames(withoutNA)=="classe")]
 numPredictors<-predictors[,sapply(predictors,is.numeric)]
 cm <- cor(numPredictors)
 highlyCorrelated <- findCorrelation(cm, cutoff=0.95,verbose=FALSE)
 drops <- colnames(numPredictors[,highlyCorrelated])
 withoutCor <- withoutNA[, !(names(withoutNA) %in% drops)]
+rm(withoutNA);rm(predictors);rm(numPredictors)
 ```
 
-# Interpretable decision tree model
-We start by fitting a decision tree model. We use PCA and crossvalidation.
+# Model trainings
 
-```{r cache=TRUE}
-#make the pricess reproducible
+## Decision tree
+We start by fitting a decision tree model with crossvalidation. This model allows for fast computation and good results interpretation
+
+```{r decision_tree_train, cache=TRUE}
+#make the process reproducible
 set.seed(1979)
-#train a decision tree with cross validation
 modelTree <- train(classe~., data=withoutCor, method="rpart", trControl = trainControl(method = "cv"))
 ```
 
-The tree uses few predictors. The accuracy is not good: for instance, no instance of class D is predicted on the training set.
-```{r}
-library(rattle)
-fancyRpartPlot(modelTree$finalModel)
-plot(varImp(modelTree, scale=FALSE))
-library(knitr)
-res <-confusionMatrix(predict(modelTree,training),training$classe)
-kable(res$table)
-res$overall
-```
 
-# Random forrest model
+## Random forest 
 
-```{r cache=TRUE}
-# train a random forrest model with PCA (thresh of 0.95) and cross validation
-modelRFPCA <- train(classe~., data=withoutCor, method="rf", preProcess=c("pca"), trControl = trainControl(method = "cv"))
-#train a random forrest without PCA
+We then train a random forest model using cross validation. Adding PCA yields exactly the same results so is not shown in this report.
+
+```{r rf_train, cache=TRUE, message=FALSE}
 modelRF <- train(classe~., data=withoutCor, method="rf", trControl = trainControl(method = "cv"))
 ```
 
-```{r}
-#modelRF
+## Gradient boosting
+
+Finally we train a boosted tree with cross validation
+```{r gbm_train, cache=TRUE, message=FALSE}
+modelGbm <- train(classe~., data=withoutCor, method="gbm", trControl = trainControl(method = "cv"),verbose=FALSE)
+```
+
+# Results
+
+## Predictors numbers and importance
+
+The following figure tree shows that a small number of predictors are used by the decision tree model
+```{r decision_tree, message=FALSE}
+suppressPackageStartupMessages(library(rattle))
+fancyRpartPlot(modelTree$finalModel)
+```
+
+
+On the other hand, both the boosted and random forest models make use of more predictors. We display them by importance on the following figure:
+
+```{r predictor_importance, message=FALSE}
+suppressPackageStartupMessages(library(ggplot2))
+rfImp <- varImp(modelRF, scale=FALSE)
+gbmImp <- varImp(modelGbm, scale=FALSE)
+
 # display variable importance estimation
-plot(varImp(modelRF, scale=FALSE))
+ggplot(rfImp) + ggtitle("Predictors importance for random forests")
+ggplot(gbmImp) + ggtitle("Predictors importance for boosted tree")
 ```
-Without PCA we get:
-```{r}
-res <-confusionMatrix(predict(modelRF,training),training$classe)
-kable(res$table)
-res$overall
+
+## Final validation on the training set
+
+The following figure displays the specificity and sensitivity results on the training set for the 3 models
+```{r training_set_results, message=FALSE}
+resDT <-confusionMatrix(predict(modelTree,training),training$classe)
+results=data.frame(class=row.names(resDT$byClass),sensitivity=resDT$byClass[,1],specificity=resDT$byClass[,2],model="decision tree")
+resGBM <-confusionMatrix(predict(modelGbm,training),training$classe)
+results=rbind(results,data.frame(class=row.names(resGBM$byClass),sensitivity=resGBM$byClass[,1],specificity=resGBM$byClass[,2],model="boosted tree"))
+resRF <-confusionMatrix(predict(modelRF,training),training$classe)
+results=rbind(results, data.frame(class=row.names(resRF$byClass),sensitivity=resRF$byClass[,1],specificity=resRF$byClass[,2],model="random forests"))
+suppressPackageStartupMessages(library(tidyr))
+res_long=gather(results,measure, value, sensitivity:specificity)
+ggplot(res_long,aes(x=class,y=value, fill=model))+geom_bar(stat="identity",position="dodge")+ facet_grid(. ~ measure)
 ```
-With PCA: 
-```{r}
-res <-confusionMatrix(predict(modelRFPCA,training),training$classe)
-kable(res$table)
-res$overall
+
+We can see that both specificity and sensitivity are poor for the decision tree, very good for boosted trees and perfect for the random forest on the training set. 
+
+The results are consistent with the figures given for Kappa and Accuracy for each model:
+```{r accuracy, message=FALSE}
+suppressPackageStartupMessages(library(knitr))
+res=data.frame(a="Accuracy",b=max(modelTree$results$Accuracy),c=max(modelGbm$results$Accuracy),d=max(modelRF$results$Accuracy))
+res=rbind(res,data.frame(a="Kappa",b=max(modelTree$results$Kappa),c=max(modelGbm$results$Kappa),d=max(modelRF$results$Kappa)))
+kable(res, caption="Accuracy and Kappa for each model on the training set",col.names=c("","Decision tree","Gradient boosting","Random forest"))
+
 ```
+
+## Predictions on the test set
+Finally, we show the results on the test set for each model. Predictions for decision tree and gradient boosting are compared to predictions for random forest which yielded 100% on the grading quizz.
+
+```{r test_set_results, message=FALSE}
+dt=predict(modelTree,testing)
+gbm=predict(modelGbm,testing)
+rf=predict(modelRF,testing)
+percDt=paste0(sum(dt==rf)/20*100,"%")
+percGbm=paste0(sum(gbm==rf)/20*100,"%")
+res <- data.frame(a="Percentage",b=percDt,c=percGbm,d="100%")
+res <- rbind(res,data.frame(a=paste("Test ",c(1:20)),b=dt,c=gbm,d=rf))
+kable(res, caption="Results for each model on the test set",col.names=c("","Decision tree","Gradient boosting","Random forest"))
+```
+
