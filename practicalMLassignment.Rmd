@@ -128,3 +128,38 @@ res <- rbind(res,data.frame(a=paste("Test ",c(1:20)),b=dt,c=gbm,d=rf))
 kable(res, caption="Results for each model on the test set",col.names=c("","Decision tree","Gradient boosting","Random forest"))
 ```
 
+# Discussion
+
+The aim of thiis report was to demonstrate how we could predict the manner in which the participants did the exercise. We now answer the requested questions:
+
+## How was the model built
+
+The training data was cleaned to remove data not related to the prediction, with more than 95% of missing values and with high corelation. From those, 3 different models were built:. 
+
+* The *decision tree* model makes use of a limited set of predictors and is the fastest to train.
+* The *gradient boosting* model uses more predictors and uses more computation
+* The *random forest* model uses the highest number of predictors and is the most computationally expensive.
+
+## How was cross validation used
+
+For each model, cross validation was used with 10 folds.
+
+## Estimation of the expected out of sample errors
+ 
+Since cross-validation was used, the expected out of sample error is not calculated in the results, but the accuracy and kappa results should be representative. We see in the results that this checks out, since:
+
+* the decision tree model had an accuracy of 42% and predicted 40% of the test set,
+* gradient boosting had between 98% and 99% and predicted all 20 observations of the test set,
+* random forest was over 99% and predicted all 20 observations.
+
+## Justification of choices
+
+I made the decision of using tree-based models since they allow for classification with non-binary outputs. I chose to fit 3 different models to evaluate the influence of the predictors/complexity tradeoffs. I used cross-validation to maximise the chance of predicting all 20 observations of the test set.
+
+## Prediction of 20 different test cases.
+
+The graded quizz proced that the 20 different test cases were predicted correctly by both gradient boosting and random forest model. 
+
+# Conclusion
+
+This assignment was a superb opportunity to practice and digest all the information given in the course. The results confirm the elements given in the videos and the documentation.
