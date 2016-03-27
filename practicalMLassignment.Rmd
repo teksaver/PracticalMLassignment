@@ -84,7 +84,7 @@ rfImp <- varImp(modelRF, scale=FALSE)
 gbmImp <- varImp(modelGbm, scale=FALSE)
 
 # display variable importance estimation
-ggplot(rfImp) + ggtitle("Predictors importance for random forests")
+ggplot(rfImp) + ggtitle("Predictors importance for random forest")
 ggplot(gbmImp) + ggtitle("Predictors importance for boosted tree")
 ```
 
@@ -97,7 +97,7 @@ results=data.frame(class=row.names(resDT$byClass),sensitivity=resDT$byClass[,1],
 resGBM <-confusionMatrix(predict(modelGbm,training),training$classe)
 results=rbind(results,data.frame(class=row.names(resGBM$byClass),sensitivity=resGBM$byClass[,1],specificity=resGBM$byClass[,2],model="boosted tree"))
 resRF <-confusionMatrix(predict(modelRF,training),training$classe)
-results=rbind(results, data.frame(class=row.names(resRF$byClass),sensitivity=resRF$byClass[,1],specificity=resRF$byClass[,2],model="random forests"))
+results=rbind(results, data.frame(class=row.names(resRF$byClass),sensitivity=resRF$byClass[,1],specificity=resRF$byClass[,2],model="random forest"))
 suppressPackageStartupMessages(library(tidyr))
 res_long=gather(results,measure, value, sensitivity:specificity)
 ggplot(res_long,aes(x=class,y=value, fill=model))+geom_bar(stat="identity",position="dodge")+ facet_grid(. ~ measure)
