@@ -1,12 +1,14 @@
 ---
 title: "Practical Machine Learning Assignment"
 author: "Sylvain Tenier"
-date: "23 mars 2016"
-output: html_document
+date: "march 27 2016"
+output:
+  html_document:
+    keep_md: yes
 ---
 # Executive summary
 
-We are tasked to create a model able to predict with great accuracy how well people do a particular activity. We are given a training set of 19622 observations from data on accelerometers on the belt, forearm, arm, and dumbell of 6 participants. We first try to fit an interpretable decision tree model that give poor results on the training set. We then create a boosted tree model that improves the resulats. Finally, we fit a random forest model that provides near-perfect accuract on the training set and 20/20 on the testing set. 
+We are tasked to create a model able to predict with great accuracy how well people do a particular activity. We are given a training set of 19622 observations from data on accelerometers on the belt, forearm, arm, and dumbell of 6 participants. We first try to fit an interpretable decision tree model that give poor results on the training set. We then create a gradient boosting model and a random forest model that provide near-perfect accuracy on the training set and 20/20 on the testing set. 
 
 
 # Loading and preprocessing
@@ -41,7 +43,7 @@ rm(withoutNA);rm(predictors);rm(numPredictors)
 # Model trainings
 
 ## Decision tree
-We start by fitting a decision tree model with crossvalidation. This model allows for fast computation and good results interpretation
+We start by fitting a decision tree model with 10-folds cross validation. This model allows for fast computation and good results interpretation
 
 ```{r decision_tree_train, cache=TRUE}
 #make the process reproducible
@@ -60,7 +62,7 @@ modelRF <- train(classe~., data=withoutCor, method="rf", trControl = trainContro
 
 ## Gradient boosting
 
-Finally we train a boosted tree with cross validation
+Finally we train a gradient boosting model with cross validation
 ```{r gbm_train, cache=TRUE, message=FALSE}
 modelGbm <- train(classe~., data=withoutCor, method="gbm", trControl = trainControl(method = "cv"),verbose=FALSE)
 ```
@@ -85,7 +87,7 @@ gbmImp <- varImp(modelGbm, scale=FALSE)
 
 # display variable importance estimation
 ggplot(rfImp) + ggtitle("Predictors importance for random forest")
-ggplot(gbmImp) + ggtitle("Predictors importance for boosted tree")
+ggplot(gbmImp) + ggtitle("Predictors importance for gradient boosting")
 ```
 
 ## Final validation on the training set
@@ -95,7 +97,7 @@ The following figure displays the specificity and sensitivity results on the tra
 resDT <-confusionMatrix(predict(modelTree,training),training$classe)
 results=data.frame(class=row.names(resDT$byClass),sensitivity=resDT$byClass[,1],specificity=resDT$byClass[,2],model="decision tree")
 resGBM <-confusionMatrix(predict(modelGbm,training),training$classe)
-results=rbind(results,data.frame(class=row.names(resGBM$byClass),sensitivity=resGBM$byClass[,1],specificity=resGBM$byClass[,2],model="boosted tree"))
+results=rbind(results,data.frame(class=row.names(resGBM$byClass),sensitivity=resGBM$byClass[,1],specificity=resGBM$byClass[,2],model="gradient boosting"))
 resRF <-confusionMatrix(predict(modelRF,training),training$classe)
 results=rbind(results, data.frame(class=row.names(resRF$byClass),sensitivity=resRF$byClass[,1],specificity=resRF$byClass[,2],model="random forest"))
 suppressPackageStartupMessages(library(tidyr))
@@ -103,7 +105,7 @@ res_long=gather(results,measure, value, sensitivity:specificity)
 ggplot(res_long,aes(x=class,y=value, fill=model))+geom_bar(stat="identity",position="dodge")+ facet_grid(. ~ measure)
 ```
 
-We can see that both specificity and sensitivity are poor for the decision tree, very good for boosted trees and perfect for the random forest on the training set. 
+We can see that both specificity and sensitivity are poor for the decision tree, very good for gradient boosting and perfect for the random forest on the training set. 
 
 The results are consistent with the figures given for Kappa and Accuracy for each model:
 ```{r accuracy, message=FALSE}
@@ -130,7 +132,7 @@ kable(res, caption="Results for each model on the test set",col.names=c("","Deci
 
 # Discussion
 
-The aim of thiis report was to demonstrate how we could predict the manner in which the participants did the exercise. We now answer the requested questions:
+The aim of this report was to demonstrate how we could predict the manner in which the participants did the exercise. We now answer the requested questions:
 
 ## How was the model built
 
@@ -146,7 +148,7 @@ For each model, cross validation was used with 10 folds.
 
 ## Estimation of the expected out of sample errors
  
-Since cross-validation was used, the expected out of sample error is not calculated in the results, but the accuracy and kappa results should be representative. We see in the results that this checks out, since:
+Since cross-validation was used, the expected out of sample error is not explicit in the results. However, accuracy and kappa numbers should be representative. We see in the results that this checks out, since:
 
 * the decision tree model had an accuracy of 42% and predicted 40% of the test set,
 * gradient boosting had between 98% and 99% and predicted all 20 observations of the test set,
